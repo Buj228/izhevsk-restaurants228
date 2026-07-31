@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Где поесть в Ижевске — подбор ресторана</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yeseva+One&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<style>
+  :root{
+    --bg:#efe6d3; --ink:#24201a; --ink-soft:#5b5347; --red:#a23226; --red-deep:#7c2419;
+    --gold:#b8862e; --gold-soft:#d9ad5e; --teal:#33564f; --card:#faf6ea; --line:#d8c9a7;
+    --line-soft:#e3d7ba; --shadow:rgba(36,32,26,0.10);
+  }
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 85% -10%, #f6efdc 0%, transparent 60%), var(--bg);
+        color:var(--ink); font-family:'Manrope',sans-serif; -webkit-font-smoothing:antialiased; }
+  a{ color:var(--red-deep); }
+  .ornament-strip{ width:100%; height:18px; display:block; }
+  .ornament-strip svg{ width:100%; height:100%; display:block; }
+  .masthead{ max-width:1180px; margin:0 auto; padding:56px 28px 0; }
+  .eyebrow{ font-family:'JetBrains Mono',monospace; font-size:12.5px; letter-spacing:.14em; text-transform:uppercase;
+            color:var(--red-deep); display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .eyebrow::before{ content:""; width:7px; height:7px; background:var(--red); display:inline-block; transform:rotate(45deg); }
+  h1.title{ font-family:'Yeseva One',serif; font-weight:400; font-size:clamp(34px,5.4vw,58px); line-height:1.05; margin:0 0 16px; max-width:16ch; }
+  h1.title em{ font-style:normal; color:var(--red); }
+  .sub{ font-size:16.5px; line-height:1.6; color:var(--ink-soft); max-width:64ch; margin:0 0 30px; }
+  .sub b{ color:var(--ink); }
+  .masthead .ornament-strip{ margin-bottom:34px; }
+  h2.section-title{ font-family:'Yeseva One',serif; font-weight:400; font-size:24px; margin:0 0 4px; }
+  .section-note{ font-size:13px; color:var(--ink-soft); margin:0 0 16px; max-width:70ch; line-height:1.6; }
+
+  /* map */
+  .map-section{ max-width:1180px; margin:0 auto; padding:8px 28px 10px; }
+  #mapEl{ width:100%; height:440px; border-radius:4px; border:1px solid var(--line); background:#e6ddc7; }
+  .map-status{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-soft); margin-top:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; }
+  .leaflet-popup-content-wrapper{ background:var(--card); color:var(--ink); border-radius:3px; font-family:'Manrope',sans-serif; }
+  .leaflet-popup-tip{ background:var(--card); }
+  .popup-name{ font-family:'Yeseva One',serif; font-size:16px; margin:0 0 4px; }
+  .popup-meta{ font-size:12px; color:var(--ink-soft); margin:0 0 3px; }
+  .popup-rating{ font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--red-deep); }
+
+  .cat-tabs{ display:flex; gap:10px; margin-bottom:22px; }
+  .cat-tab{ font-family:'Yeseva One',serif; font-size:17px; padding:10px 22px; border:1px solid var(--line);
+            background:transparent; border-radius:30px; cursor:pointer; color:var(--ink-soft);
+            transition:background .15s,color .15s,border-color .15s; }
+  .cat-tab.active{ background:var(--ink); border-color:var(--ink); color:#f5ecd8; }
+  .cat-tab .n{ font-family:'JetBrains Mono',monospace; font-size:12px; opacity:.7; margin-left:6px; }
+
+  .filters{ max-width:1180px; margin:0 auto; padding:0 28px 26px; position:sticky; top:0; z-index:20;
+             background:linear-gradient(var(--bg) 82%, transparent); padding-top:18px; }
+  .filters-card{ background:var(--card); border:1px solid var(--line); border-radius:4px; padding:20px 22px 22px;
+                 box-shadow:0 10px 30px -18px var(--shadow); }
+  .filter-row{ display:flex; flex-wrap:wrap; gap:18px 26px; align-items:flex-end; }
+  .filter-block{ display:flex; flex-direction:column; gap:8px; }
+  .filter-label{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft); }
+  input[type="search"]{ font-family:'Manrope',sans-serif; font-size:15px; padding:10px 12px; border:1px solid var(--line);
+                          background:#fffdf7; border-radius:3px; min-width:220px; color:var(--ink); }
+  input[type="search"]:focus, select:focus, .chip:focus-visible, .rate-btn:focus-visible, .cat-tab:focus-visible{ outline:2px solid var(--red); outline-offset:2px; }
+  select{ font-family:'Manrope',sans-serif; font-size:14.5px; padding:10px 12px; border:1px solid var(--line);
+          background:#fffdf7; border-radius:3px; color:var(--ink); min-width:190px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; max-width:640px; }
+  .chip{ font-family:'Manrope',sans-serif; font-size:13.5px; padding:7px 13px; border:1px solid var(--line);
+         background:#fffdf7; border-radius:20px; cursor:pointer; color:var(--ink-soft); transition:background .15s,color .15s,border-color .15s; }
+  .chip:hover{ border-color:var(--gold-soft); }
+  .chip.active{ background:var(--red); border-color:var(--red); color:#fbf3e6; }
+  .rate-group{ display:flex; gap:6px; }
+  .rate-btn{ font-family:'JetBrains Mono',monospace; font-size:13px; padding:9px 12px; border:1px solid var(--line);
+             background:#fffdf7; border-radius:3px; cursor:pointer; color:var(--ink-soft); }
+  .rate-btn.active{ background:var(--ink); border-color:var(--ink); color:#f5ecd8; }
+  .clear-btn{ font-family:'Manrope',sans-serif; font-size:13.5px; color:var(--red-deep); background:none; border:none;
+              cursor:pointer; text-decoration:underline; text-underline-offset:3px; padding:10px 0; }
+  .count-line{ font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--ink-soft); margin-top:16px;
+               padding-top:14px; border-top:1px dashed var(--line); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+
+  .grid-wrap{ max-width:1180px; margin:0 auto; padding:30px 28px 20px; }
+  .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  @media (max-width:980px){ .grid{ grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:640px){ .grid{ grid-template-columns:1fr; } }
+
+  .card{ position:relative; background:var(--card); border:1px solid var(--line); border-radius:3px;
+         padding:22px 20px 20px; display:flex; flex-direction:column; gap:12px; transition:transform .18s ease, box-shadow .18s ease; }
+  .card:hover{ transform:translateY(-3px); box-shadow:0 16px 34px -20px var(--shadow); }
+  .corner{ position:absolute; width:20px; height:20px; border-top:2px solid var(--gold); border-left:2px solid var(--gold);
+           top:8px; left:8px; opacity:0; transform:scale(.7); transition:opacity .25s ease, transform .25s ease; }
+  .corner.br{ border-top:none; border-left:none; border-bottom:2px solid var(--gold); border-right:2px solid var(--gold);
+              top:auto; left:auto; bottom:8px; right:8px; }
+  .card:hover .corner{ opacity:1; transform:scale(1); }
+  .card-top{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .card-name{ font-family:'Yeseva One',serif; font-weight:400; font-size:21px; line-height:1.2; margin:0; }
+  .card-type{ font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--teal); white-space:nowrap; padding-top:4px; }
+  .card-desc{ font-size:14px; line-height:1.5; color:var(--ink-soft); margin:0; }
+  .tag-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .tag{ font-size:12px; padding:3px 9px; border:1px solid var(--line); border-radius:3px; color:var(--ink-soft); background:rgba(184,134,46,0.06); }
+  .meta-row{ font-size:13px; color:var(--ink-soft); display:flex; flex-direction:column; gap:3px; }
+  .meta-row .district{ color:var(--red-deep); font-weight:600; }
+  .hours-line{ font-size:12.5px; color:var(--ink-soft); }
+  .hours-line b{ color:var(--ink); }
+  .rating-block{ margin-top:4px; padding-top:12px; border-top:1px solid var(--line-soft); }
+  .rating-num-row{ display:flex; align-items:baseline; gap:8px; margin-bottom:7px; }
+  .rating-num{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:26px; }
+  .rating-out{ font-size:12px; color:var(--ink-soft); font-family:'JetBrains Mono',monospace; }
+  .rating-bar-track{ height:6px; width:100%; background:var(--line-soft); border-radius:4px; overflow:hidden; margin-bottom:9px; }
+  .rating-bar-fill{ height:100%; background:linear-gradient(90deg,var(--gold),var(--red)); border-radius:4px; }
+  .source-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .source-chip{ font-family:'JetBrains Mono',monospace; font-size:11px; padding:3px 8px; border-radius:2px; background:var(--ink); color:#f4ead2; }
+  .card-foot{ margin-top:4px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .check{ font-size:13px; color:var(--ink-soft); }
+  .check b{ color:var(--ink); font-family:'JetBrains Mono',monospace; }
+  .link-row{ display:flex; gap:12px; }
+  .map-link{ font-family:'JetBrains Mono',monospace; font-size:12px; text-decoration:none; border-bottom:1px solid var(--red-deep); padding-bottom:1px; white-space:nowrap; }
+
+  .chain-badge{ font-family:'JetBrains Mono',monospace; font-size:11px; padding:3px 8px; border-radius:2px; background:var(--teal); color:#f0ece0; align-self:flex-start; }
+  .expand-btn{ font-family:'Manrope',sans-serif; font-size:13.5px; font-weight:700; color:var(--red-deep); background:none;
+               border:1px solid var(--line); border-radius:3px; padding:8px 12px; cursor:pointer; text-align:left; }
+  .expand-btn:hover{ border-color:var(--gold-soft); }
+  .chain-locations{ display:none; flex-direction:column; gap:8px; margin-top:4px; padding-top:10px; border-top:1px dashed var(--line); }
+  .chain-locations.open{ display:flex; }
+  .loc-row{ font-size:13px; display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:6px 0; border-bottom:1px solid var(--line-soft); }
+  .loc-row:last-child{ border-bottom:none; }
+  .loc-addr{ color:var(--ink); }
+  .loc-district{ color:var(--red-deep); font-size:11.5px; }
+  .loc-rating{ font-family:'JetBrains Mono',monospace; font-weight:700; white-space:nowrap; }
+  .loc-link{ font-family:'JetBrains Mono',monospace; font-size:11.5px; white-space:nowrap; }
+
+  .empty-state{ grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--ink-soft); font-family:'JetBrains Mono',monospace; font-size:14px; }
+  footer{ max-width:1180px; margin:20px auto 0; padding:30px 28px 70px; color:var(--ink-soft); font-size:13px; line-height:1.7; }
+  footer .ornament-strip{ margin-bottom:26px; }
+  footer strong{ color:var(--ink); }
+  footer a{ color:var(--red-deep); }
+  @media (prefers-reduced-motion:reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="eyebrow">Ижевск · подбор ресторана</div>
+  <h1 class="title">Где сегодня <em>поесть</em> в Ижевске</h1>
+  <p class="sub"><b>27 заведений + 4 сети</b> (в сетях ещё 22 точки по городу) — рестораны, кафе и фастфуд, проверенные по 2ГИС, Яндекс Картам, Google, Zoon, TripAdvisor и Restaurant Guru. Часы работы — где нашлись подтверждённые данные; карта ниже двигается и масштабируется, координаты подтягиваются вживую через открытый геосервис OpenStreetMap.</p>
+  <div class="ornament-strip"><svg viewBox="0 0 1160 18" preserveAspectRatio="none"><defs>
+    <pattern id="orn" width="58" height="18" patternUnits="userSpaceOnUse">
+      <polygon points="0,9 14,1 28,9 14,17" fill="none" stroke="#a23226" stroke-width="1.4"/>
+      <polygon points="29,9 43,4 57,9 43,14" fill="#b8862e" opacity="0.9"/>
+    </pattern></defs>
+    <rect width="1160" height="18" fill="url(#orn)"/>
+  </svg></div>
+</header>
+
+<section class="map-section">
+  <h2 class="section-title">Карта</h2>
+  <p class="section-note">Двигайте и масштабируйте как обычную карту; наведите на точку — всплывёт название, кухня, район и рейтинг. Координаты каждого адреса запрашиваются прямо сейчас у OpenStreetMap (Nominatim) — вживую, не заданы заранее вручную. Для сетей на карте — только одна точка-флагман; полный список филиалов смотрите в карточке ниже.</p>
+  <div id="mapEl"></div>
+  <div class="map-status" id="mapStatus"><span>Загрузка точек…</span><span>© OpenStreetMap contributors</span></div>
+</section>
+
+<section class="filters">
+  <div class="filters-card">
+    <div class="cat-tabs" id="catTabs"></div>
+    <div class="filter-row">
+      <div class="filter-block"><span class="filter-label">Поиск</span><input type="search" id="searchInput" placeholder="Название заведения…"></div>
+      <div class="filter-block"><span class="filter-label">Район</span><select id="districtSelect"><option value="all">Все районы</option></select></div>
+      <div class="filter-block"><span class="filter-label">Оценка</span><div class="rate-group" id="rateGroup"></div></div>
+      <div class="filter-block"><span class="filter-label">Сортировка</span>
+        <select id="sortSelect">
+          <option value="rating_desc">По рейтингу ↓</option>
+          <option value="name_asc">По названию А→Я</option>
+          <option value="check_asc">По чеку ↑</option>
+        </select>
+      </div>
+      <button class="clear-btn" id="clearBtn">Сбросить фильтры</button>
+    </div>
+    <div class="filter-block" style="margin-top:16px;"><span class="filter-label">Кухня</span><div class="chips" id="cuisineChips"></div></div>
+    <div class="count-line"><span id="countLine"></span><span>снимок данных: июль 2026</span></div>
+  </div>
+</section>
+
+<div class="grid-wrap"><div class="grid" id="grid"></div></div>
+
+<footer>
+  <div class="ornament-strip"><svg viewBox="0 0 1160 18" preserveAspectRatio="none"><rect width="1160" height="18" fill="url(#orn)"/></svg></div>
+  <p><strong>Про часы работы.</strong> Прямого доступа к браузеру для live-проверки «открыто сейчас» по-прежнему нет, поэтому часы взяты из официальных графиков заведений (Zoon, сайты заведений, 2ГИС) — где нашлось полное расписание на неделю, оно в карточке; где нашлась только одна цифра (например, время закрытия сегодня), это честно помечено «уточняйте». Часы всё равно стоит сверить перед визитом — праздники и ремонты (как у «Кофе Семь») меняют график без предупреждения.</p>
+  <p><strong>Про карту.</strong> Координаты не заданы вручную — при открытии страницы сайт сам спрашивает точный адрес у Nominatim (открытый геосервис OpenStreetMap) и ставит точку туда, куда ответит сервис. Если у вас в браузере заблокированы внешние запросы, карта покажет пустой фон — фильтры и карточки при этом работают как обычно.</p>
+  <p><strong>Про фото.</strong> Настоящие фотографии интерьеров и фасадов чужих заведений — это чужие материалы (2ГИС, сами заведения), и просто вставить их по ссылке в файл ненадёжно и нечестно по отношению к правообладателям. Вместо этого у каждой карточки с прямой ссылкой на 2ГИС есть кнопка «Фото →», которая ведёт прямо во вкладку с реальными фотографиями от гостей и заведения.</p>
+  <p><strong>Про сети.</strong> Mama Pizza, Додо Пицца, «Вкусно — и точка» и Rostic's показаны одной карточкой каждая — жмите «Показать все адреса», чтобы развернуть список всех найденных точек по городу с адресом, районом и рейтингом именно этой точки (у сетей рейтинг сильно отличается от адреса к адресу).</p>
+  <p><strong>Честно о покрытии.</strong> В Ижевске около 2000 заведений общепита (Zoon) — здесь 49 реальных адресов, по которым нашлась проверяемая информация минимум по одному источнику. Пока в мае 2026 в городе открылось китайское кафе «Игры красных тигров» — оно осталось за бортом: слишком новое, устойчивого рейтинга ещё нигде нет.</p>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const VENUES = [
+  {cat:"dining", name:"Пряный Кролик", type:"Бар", cuisines:["Европейская","Авторская"], district:"Октябрьский", address:"ул. Свободы, 173",
+   desc:"Винный бар с европейской и авторской кухней, летняя веранда. «Лучший бар 2025» по версии 2ГИС.", check:1700, hours:"~08:00–01:00 (уточняйте)",
+   ratings:{"2ГИС":{v:4.9,c:"10 414 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001025674028"},
+  {cat:"dining", name:"Minbo", type:"Кафе", cuisines:["Паназиатская","Японская"], district:"Октябрьский", address:"ул. Максима Горького, 70",
+   desc:"Рамен, суши и bubble tea. «Лучшее кафе 2025» по версии 2ГИС.", check:800, hours:"~09:00–01:00 (уточняйте)",
+   ratings:{"2ГИС":{v:5.0,c:"11 483 оценки"}, "Zoon":{v:4.2,c:"6 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001061160497"},
+  {cat:"dining", name:"Кинза", type:"Хинкальная", cuisines:["Грузинская"], district:"Октябрьский", address:"Пушкинская ул., 268",
+   desc:"Сеть грузинских хинкальных с несколькими залами по городу, летняя веранда.", check:700, hours:"Пн–Чт, Вс 09:00–23:00; Пт–Сб 09:00–24:00",
+   ratings:{"2ГИС":{v:4.9,c:"1 418 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001036200436"},
+  {cat:"dining", name:"Бобровая долина", type:"Этно-ресторан", cuisines:["Удмуртская","Татарская","Русская"], district:"Первомайский", address:"ул. Свердлова, 4",
+   desc:"Этнокомплекс с национальной кухней: перепечи, табани, пельняни, домашние настойки.", check:1000, hours:"уточняйте (комплекс работает допоздна)",
+   ratings:{"2ГИС":{v:4.8,c:"291 оценка"}, "Google":{v:4.6,c:""}, "Restaurant Guru":{v:4.9,c:"1 727 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001006579045"},
+  {cat:"dining", name:"Хочу Пури", type:"Ресторан", cuisines:["Грузинская"], district:"Октябрьский", address:"Пушкинская ул., 265",
+   desc:"Грузинская кухня, панорамный вид, большой банкетный зал.", check:1350, hours:"уточняйте",
+   ratings:{"2ГИС":{v:4.7,c:"296 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001090421392"},
+  {cat:"dining", name:"Panorama", type:"Ресторан при отеле", cuisines:["Европейская","Итальянская"], district:"Октябрьский", address:"Милиционная ул., 5",
+   desc:"Ресторан на набережной пруда при отеле Panorama, «Лучшая гостиница 2025».", check:null, hours:"уточняйте",
+   ratings:{"2ГИС":{v:4.7,c:"1 556 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001037537513"},
+  {cat:"dining", name:"Старый Особняк", type:"Ресторан", cuisines:["Европейская","Кавказская","Авторская"], district:"Октябрьский", address:"ул. Ленина, 15",
+   desc:"Ресторан в купеческом особняке 1912 года: живая музыка, караоке-зал наверху после 18:00.", check:null, hours:"с обеда допоздна, точный график уточняйте",
+   ratings:{"2ГИС":{v:4.6,c:"184 оценки"}}, map:"https://2gis.ru/izhevsk/firm/70000001075875873"},
+  {cat:"dining", name:"Ваще Огонь", type:"Мясной ресторан", cuisines:["Мясная","Европейская"], district:"Октябрьский", address:"Пушкинская ул., 223",
+   desc:"Стейки и мясная кухня с элементами поп-культуры, живой рок по выходным.", check:1600, hours:"Пн–Чт, Вс 11:00–23:00; Пт–Сб 11:00–01:00",
+   ratings:{"2ГИС":{v:4.6,c:"538 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001080694591"},
+  {cat:"dining", name:"Тифлисъ", type:"Ресторан", cuisines:["Грузинская","Кавказская"], district:"Октябрьский", address:"ул. Максима Горького, 156",
+   desc:"Грузинская кухня в центре, банкетный зал, живая музыка по вечерам.", check:1000, hours:"Пн–Чт, Вс 10:30–23:30; Пт–Сб 10:30–24:00",
+   ratings:{"2ГИС":{v:4.6,c:"321 оценка"}, "Restaurant Guru":{v:4.5,c:"610 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001040189910"},
+  {cat:"dining", name:"Луна и Черепаха", type:"Кафе", cuisines:["Паназиатская"], district:"Октябрьский", address:"ул. Свободы, 173",
+   desc:"Небольшое паназиатское кафе рядом со сквером, атмосферный интерьер.", check:null, hours:"закрывается ~02:00, уточняйте",
+   ratings:{"2ГИС":{v:4.6,c:"149 оценок"}}, map:"https://2gis.ru/izhevsk/search/Луна%20и%20Черепаха%20Ижевск"},
+  {cat:"dining", name:"Каре", type:"Ресторан", cuisines:["Грузинская","Паназиатская","Смешанная"], district:"Октябрьский", address:"Красногеройская ул., 14",
+   desc:"Эклектичное меню от хачапури и суши до стейков, панорамная веранда.", check:null, hours:"Ежедневно 11:00–01:00",
+   ratings:{"2ГИС":{v:4.5,c:"526 оценок"}}, map:"https://2gis.ru/izhevsk/search/Каре%20ресторан%20Ижевск"},
+  {cat:"dining", name:"Довольная рыба", type:"Кафе", cuisines:["Паназиатская","Японская"], district:"Октябрьский", address:"Пушкинская ул., 198",
+   desc:"Азиатская кухня и суши, уютный зал с диванами.", check:600, hours:"Пн–Чт, Вс 11:00–23:00; Пт–Сб 11:00–00:00",
+   ratings:{"2ГИС":{v:4.5,c:"139 оценок"}}, map:"https://2gis.ru/izhevsk/search/Довольная%20рыба%20Ижевск"},
+  {cat:"dining", name:"Бакинский двор", type:"Ресторан", cuisines:["Азербайджанская"], district:"Ленинский", address:"ул. Зои Космодемьянской, 10",
+   desc:"Азербайджанская кухня и мангал, восточная атмосфера.", check:1200, hours:"Пн–Чт 12:00–23:00; Пт–Сб 12:00–01:00; Вс 12:00–22:00",
+   ratings:{"2ГИС":{v:4.5,c:"90 оценок"}}, map:"https://2gis.ru/izhevsk/search/Бакинский%20двор%20Ижевск"},
+  {cat:"dining", name:"Старик Хинкалыч", type:"Хинкальная", cuisines:["Грузинская","Кавказская"], district:"Октябрьский", address:"Пушкинская ул., 252",
+   desc:"Сеть хинкальных с доступными ценами, несколько филиалов по городу.", check:650, hours:"уточняйте",
+   ratings:{"2ГИС":{v:4.4,c:"450 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001046016504"},
+  {cat:"dining", name:"Санапиро", type:"Ресторанный комплекс", cuisines:["Грузинская","Европейская"], district:"Октябрьский", address:"Милиционная ул., 7а",
+   desc:"Четырёхэтажный комплекс: грузинская и европейская кухня, караоке, кальян.", check:null, hours:"Вс–Чт 12:00–00:00; Пт–Сб 12:00–02:00",
+   ratings:{"2ГИС":{v:3.8,c:"179 оценок"}, "Zoon":{v:3.7,c:""}}, map:"https://2gis.ru/izhevsk/firm/70000001104016855"},
+  {cat:"dining", name:"Юпитер 5", type:"Паб", cuisines:["Русская","Европейская"], district:"Октябрьский", address:"ул. Свободы, 173",
+   desc:"Паб с русской и европейской кухней по соседству с «Пряным кроликом».", check:900, hours:"закрывается ~06:00 утра, уточняйте",
+   ratings:{"2ГИС":{v:3.6,c:"114 оценок"}}, map:"https://2gis.ru/izhevsk/search/Юпитер%205%20Ижевск"},
+  {cat:"dining", name:"Сыр-Бор", type:"Ресторан-сыроварня", cuisines:["Русская","Удмуртская"], district:"Первомайский", address:"Пушкинская ул., 130а",
+   desc:"Стейки и блюда с сыром собственного производства, детская игровая комната. «Лучший ресторан 2026» по версии 2ГИС.", check:2000, hours:"закрывается ~00:00, уточняйте",
+   ratings:{"2ГИС":{v:4.8,c:"2 724 оценки"}}, map:"https://2gis.ru/izhevsk/firm/70000001091811588"},
+  {cat:"dining", name:"Вино и Мясо", type:"Ресторан", cuisines:["Европейская","Мясная"], district:"Первомайский", address:"ул. Ленина, 45 (ДЦ Удмуртия)",
+   desc:"Стейки и мясная кухня в респектабельном интерьере, живая музыка по выходным.", check:3000, hours:"уточняйте",
+   ratings:{"2ГИС":{v:4.9,c:"4 256 оценок"}, "Restaurant Guru":{v:3.5,c:"1 214 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/5770765303571192"},
+  {cat:"dining", name:"Нино играет в домино", type:"Ресторан", cuisines:["Грузинская"], district:"Октябрьский", address:"ул. Максима Горького, 88",
+   desc:"Семейное грузинское заведение с уютным интерьером и живой музыкой.", check:2000, hours:"уточняйте",
+   ratings:{"2ГИС":{v:4.9,c:"11 117 оценок"}, "TripAdvisor":{v:4.1,c:"48 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001035794197"},
+  {cat:"dining", name:"Так или Иначос", type:"Бар", cuisines:["Мексиканская"], district:"Октябрьский", address:"ул. Свободы, 173",
+   desc:"Коктейльный бар с адаптированной мексиканской кухней: тако, начос, буррито.", check:900, hours:"вечер/ночь, ориентировочно 16:00–02:00, уточняйте",
+   ratings:{"2ГИС":{v:4.9,c:"1 480 оценок"}, "TripAdvisor":{v:3.0,c:"3 отзыва"}}, map:"https://2gis.ru/izhevsk/firm/70000001045982647"},
+  {cat:"dining", name:"НИИ Рассказов", type:"Кафе", cuisines:["Кавказская","Русская"], district:"Октябрьский", address:"ул. Свободы, 173",
+   desc:"Бар-квартирник в стиле СССР с музыкой на виниле и шашлычно-хинкальным меню.", check:800, hours:"~12:00–04:00, уточняйте",
+   ratings:{"2ГИС":{v:4.7,c:"97 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001065954461"},
+  {cat:"dining", name:"Вчерашние Новости", type:"Релакс-бар", cuisines:["Смешанная"], district:"Октябрьский", address:"ул. Свободы, 173 (2 этаж)",
+   desc:"Расслабленный бар этажом выше «НИИ Рассказов», летняя веранда.", check:null, hours:"закрывается ~02:00, уточняйте",
+   ratings:{"2ГИС":{v:4.6,c:"78 оценок"}}, map:"https://2gis.ru/izhevsk/search/Вчерашние%20новости%20Ижевск"},
+  {cat:"dining", name:"На Крыше 173", type:"Бар", cuisines:["Смешанная"], district:"Октябрьский", address:"ул. Свободы, 173 (4 этаж)",
+   desc:"Бар и гриль-кухня на крыше того же дома, что «Пряный Кролик» и «НИИ Рассказов».", check:null, hours:"закрывается ~23:00, уточняйте",
+   ratings:{"2ГИС":{v:4.4,c:"18 оценок"}}, map:"https://2gis.ru/izhevsk/search/На%20Крыше%20173%20Ижевск"},
+  {cat:"dining", name:"Тётушка Чанг", type:"Ресторан", cuisines:["Тайская","Паназиатская"], district:"Устиновский", address:"ТРК Петровский, ул. им. Петрова, 29",
+   desc:"Тайская кухня в фуд-корте ТРК Петровский: вок, том-ям, bubble tea.", check:700, hours:"закрывается ~22:00, уточняйте",
+   ratings:{"2ГИС":{v:4.8,c:"168 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001102339010"},
+  {cat:"dining", name:"Ялта", type:"Кафе-ресторан", cuisines:["Грузинская","Кавказская","Русская"], district:"Октябрьский", address:"ул. Карла Маркса, 438",
+   desc:"Грузинско-русская кухня, шашлык и чебуреки, летняя веранда.", check:800, hours:"~08:30–23:00, уточняйте",
+   ratings:{"2ГИС":{v:4.9,c:"506 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001024066779"},
+  {cat:"fast", name:"Ронни", type:"Бургер-клуб", cuisines:["Бургеры","Американская"], district:"Октябрьский", address:"Центральная площадь, ул. Карла Маркса, 246",
+   desc:"Флагманский бургер-клуб сети Welcome Group на центральной площади.", check:null, hours:"закрывается ~03:00, уточняйте",
+   ratings:{"2ГИС":{v:4.9,c:"889 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001024056434"},
+  {cat:"fast", name:"Ронни Дайнер", type:"Бургерная-бар", cuisines:["Бургеры","Американская"], district:"Октябрьский", address:"ул. Максима Горького, 70",
+   desc:"«Мясо, бургеры, истории» — второй формат «Ронни» в здании Minbo.", check:850, hours:"закрывается ~01:00, уточняйте",
+   ratings:{"2ГИС":{v:4.9,c:"2 025 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001091757912"},
+];
+
+const CHAINS = [
+  {cat:"fast", name:"Mama Pizza", type:"Семейное кафе (сеть)", cuisines:["Пицца","Итальянская"],
+   desc:"Местная сеть семейных пиццерий — почти в каждой точке детская игровая комната.", hours:"типично ~07:30–23:00 (по адресам отличается)",
+   locations:[
+     {address:"Советская ул., 15", district:"Октябрьский", check:1000, ratings:{"2ГИС":{v:4.9,c:"9 841 оценка"}}, map:"https://2gis.ru/izhevsk/branches/5770765303828225"},
+     {address:"ул. Кирова, 127а", district:"уточняется", check:950, ratings:{"2ГИС":{v:4.9,c:"11 629 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001035129065"},
+     {address:"Майская ул., 9", district:"Октябрьский", check:null, ratings:{"2ГИС":{v:4.9,c:"8 040 оценок"}}, map:"https://2gis.ru/izhevsk/branches/5770765303828225"},
+     {address:"Восточная ул., 32", district:"Первомайский", check:null, ratings:{"2ГИС":{v:4.9,c:"7 725 оценок"}}, map:"https://2gis.ru/izhevsk/branches/5770765303828225"},
+     {address:"Пушкинская ул., 165 (ТЦ Медведь)", district:"Первомайский", check:1000, ratings:{"2ГИС":{v:4.9,c:"8 771 оценка"}}, map:"https://2gis.ru/izhevsk/firm/70000001025695656"},
+     {address:"Молодёжная ул., 34", district:"Октябрьский", check:450, ratings:{"2ГИС":{v:4.9,c:"424 оценки"}}, map:"https://2gis.ru/izhevsk/firm/5770765303665390"},
+     {address:"ТРК Петровский, ул. им. Петрова, 29", district:"Устиновский", check:1000, ratings:{"2ГИС":{v:4.9,c:"447 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001075938041"},
+     {address:"Школьная ул., 44Б", district:"Октябрьский", check:950, ratings:{"2ГИС":{v:4.9,c:"345 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/5770765303828225"},
+     {address:"ул. 9 Января, 211", district:"Индустриальный", check:950, ratings:{"2ГИС":{v:4.9,c:"352 отзыва"}}, map:"https://2gis.ru/izhevsk/branches/5770765303828225"},
+   ]},
+  {cat:"fast", name:"Додо Пицца", type:"Пиццерия (сеть)", cuisines:["Пицца","Американская"],
+   desc:"Федеральная сеть доставки и пиццерий с залом при части точек.", hours:"типично ~09:30–22:00/22:30 (по адресам отличается)",
+   locations:[
+     {address:"ул. 50 лет ВЛКСМ, 49", district:"Октябрьский", check:null, ratings:{"2ГИС":{v:4.7,c:"410 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001045878325"},
+     {address:"Удмуртская ул., 304", district:"Индустриальный", check:500, ratings:{"2ГИС":{v:4.6,c:"245 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001028907150"},
+     {address:"ул. Гагарина, 27", district:"Ленинский", check:500, ratings:{"2ГИС":{v:4.0,c:"48 отзывов"}, "Zoon":{v:4.3,c:"7 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001053699613"},
+     {address:"ТЦ КИТ, ул. Ленина, 138", district:"Первомайский", check:382, ratings:{"2ГИС":{v:4.5,c:"260 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001061227459"},
+     {address:"ТЦ Мой Порт, ул. Кирова, 146", district:"уточняется", check:null, ratings:{"2ГИС":{v:4.0,c:"128 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001083938641"},
+     {address:"ТЦ Октябрь, ул. 9 Января, 219а", district:"Индустриальный", check:null, ratings:{"2ГИС":{v:4.2,c:"108 оценок"}}, map:"https://2gis.ru/izhevsk/branches/70000001028907149"},
+   ]},
+  {cat:"fast", name:"Вкусно — и точка", type:"Фастфуд (сеть, бывший Макдоналдс)", cuisines:["Бургеры","Американская"],
+   desc:"3 точки в Ижевске, у части есть отдельное окно автокафе.", hours:"зал ~07:00–24:00; часть точек — круглосуточное окно авто",
+   locations:[
+     {address:"ул. Ленина, 140а", district:"Первомайский", check:500, ratings:{"2ГИС":{v:3.7,c:"197 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/70000001025809806"},
+     {address:"ул. 10 лет Октября, 32в", district:"Индустриальный", check:500, ratings:{"2ГИС":{v:2.4,c:"226 отзывов"}}, map:"https://2gis.ru/izhevsk/firm/5770765303764605"},
+     {address:"Автозаводская ул., 2а", district:"Устиновский", check:null, ratings:{"Zoon":{v:2.0,c:"2 оценки — слишком мало данных"}}, map:"https://2gis.ru/izhevsk/search/Вкусно%20и%20точка%20Автозаводская%20Ижевск"},
+   ]},
+  {cat:"fast", name:"Rostic's", type:"Ресторан быстрого обслуживания (бывший KFC)", cuisines:["Курица","Американская"],
+   desc:"Куриные крылышки и стрипсы, несколько точек по городу.", hours:"типично ~10:00–22:00 (по адресам отличается)",
+   locations:[
+     {address:"Школьная ул., 43", district:"Октябрьский", check:null, ratings:{"2ГИС":{v:2.2,c:"216 оценок"}}, map:"https://2gis.ru/izhevsk/firm/70000001006712266"},
+     {address:"ТЦ Омега, ул. 10 лет Октября, 32", district:"Индустриальный", check:null, ratings:{"2ГИС":{v:2.1,c:"158 оценок"}}, map:"https://2gis.ru/izhevsk/branches/70000001074394435"},
+     {address:"ул. Карла Маркса, 177", district:"Октябрьский", check:null, ratings:{"2ГИС":{v:2.8,c:"344 оценки"}}, map:"https://2gis.ru/izhevsk/branches/70000001074394435"},
+     {address:"ТРК Петровский, ул. им. Петрова, 29", district:"Устиновский", check:null, ratings:{}, map:"https://2gis.ru/izhevsk/firm/70000001075449311"},
+   ]},
+];
+
+function avgOf(nums){ const v=nums.filter(n=>typeof n==="number"); if(!v.length) return null; return Math.round((v.reduce((a,b)=>a+b,0)/v.length)*10)/10; }
+
+VENUES.forEach(r=>{ r.avg = avgOf(Object.values(r.ratings).map(x=>x.v)); r.isChain=false; });
+CHAINS.forEach(ch=>{
+  ch.isChain = true;
+  ch.locations.forEach(l=>{ l.avg = avgOf(Object.values(l.ratings).map(x=>x.v)); });
+  ch.avg = avgOf(ch.locations.map(l=>l.avg));
+});
+
+function itemDistricts(item){ return item.isChain ? [...new Set(item.locations.map(l=>l.district))] : [item.district]; }
+
+const state = { cat:"dining", search:"", district:"all", cuisine:null, minRating:0, sort:"rating_desc" };
+
+const catTabsEl = document.getElementById('catTabs');
+const cats = [ {key:"dining", label:"Рестораны и кафе"}, {key:"fast", label:"Фастфуд"} ];
+cats.forEach(c=>{
+  const n = VENUES.filter(r=>r.cat===c.key).length + CHAINS.filter(r=>r.cat===c.key).length;
+  const b = document.createElement('button');
+  b.className = 'cat-tab' + (c.key===state.cat ? ' active' : '');
+  b.type = 'button';
+  b.innerHTML = `${c.label}<span class="n">${n}</span>`;
+  b.addEventListener('click', ()=>{
+    state.cat=c.key; state.cuisine=null; state.district="all";
+    document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('districtSelect').value="all";
+    buildCuisineChips(); buildDistrictOptions(); render();
+  });
+  catTabsEl.appendChild(b);
+});
+
+function currentCatData(){ return [...VENUES.filter(r=>r.cat===state.cat), ...CHAINS.filter(r=>r.cat===state.cat)]; }
+
+function buildDistrictOptions(){
+  const sel = document.getElementById('districtSelect');
+  sel.innerHTML = '<option value="all">Все районы</option>';
+  const districts = [...new Set(currentCatData().flatMap(itemDistricts))].filter(d=>d!=="уточняется").sort((a,b)=>a.localeCompare(b,'ru'));
+  districts.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; sel.appendChild(o); });
+}
+
+function buildCuisineChips(){
+  const wrap = document.getElementById('cuisineChips');
+  wrap.innerHTML="";
+  const cuisines = [...new Set(currentCatData().flatMap(r=>r.cuisines))].sort((a,b)=>a.localeCompare(b,'ru'));
+  cuisines.forEach(c=>{
+    const el=document.createElement('button'); el.className='chip'; el.textContent=c; el.type="button";
+    el.addEventListener('click', ()=>{
+      state.cuisine = state.cuisine===c ? null : c;
+      document.querySelectorAll('.chip').forEach(ch=>ch.classList.remove('active'));
+      if(state.cuisine) el.classList.add('active');
+      render();
+    });
+    wrap.appendChild(el);
+  });
+}
+
+const rates=[{label:"Любая",v:0},{label:"4.0+",v:4.0},{label:"4.5+",v:4.5},{label:"4.8+",v:4.8}];
+const rateGroup = document.getElementById('rateGroup');
+rates.forEach((r,i)=>{
+  const b=document.createElement('button'); b.className='rate-btn'+(i===0?' active':''); b.textContent=r.label; b.type="button";
+  b.addEventListener('click', ()=>{
+    state.minRating=r.v;
+    document.querySelectorAll('.rate-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); render();
+  });
+  rateGroup.appendChild(b);
+});
+
+document.getElementById('searchInput').addEventListener('input', e=>{ state.search=e.target.value.trim().toLowerCase(); render(); });
+document.getElementById('districtSelect').addEventListener('change', e=>{ state.district=e.target.value; render(); });
+document.getElementById('sortSelect').addEventListener('change', e=>{ state.sort=e.target.value; render(); });
+document.getElementById('clearBtn').addEventListener('click', ()=>{
+  state.search=""; state.district="all"; state.cuisine=null; state.minRating=0; state.sort="rating_desc";
+  document.getElementById('searchInput').value=""; document.getElementById('districtSelect').value="all"; document.getElementById('sortSelect').value="rating_desc";
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.rate-btn').forEach((b,i)=>b.classList.toggle('active', i===0));
+  render();
+});
+
+function ratingColor(v){ if(v===null) return 'var(--ink-soft)'; if(v>=4.7) return 'var(--red)'; if(v>=4.2) return 'var(--gold)'; return 'var(--ink-soft)'; }
+function photoLink(url){ return url && url.includes('/firm/') ? url + '/tab/photos' : null; }
+
+function sourceChipsHtml(ratings){
+  return Object.entries(ratings).map(([src,o])=>
+    `<span class="source-chip">${src}${typeof o.v==="number" ? ' '+o.v.toFixed(1) : ''}${o.c ? ' · '+o.c : ''}</span>`).join('');
+}
+
+function venueCard(r){
+  const el=document.createElement('article'); el.className='card';
+  const photo = photoLink(r.map);
+  el.innerHTML = `
+    <span class="corner"></span><span class="corner br"></span>
+    <div class="card-top"><h3 class="card-name">${r.name}</h3><span class="card-type">${r.type}</span></div>
+    <p class="card-desc">${r.desc}</p>
+    <div class="tag-row">${r.cuisines.map(c=>`<span class="tag">${c}</span>`).join('')}</div>
+    <div class="meta-row"><span class="district">${r.district} район</span><span>${r.address}</span></div>
+    <div class="hours-line">Часы: <b>${r.hours || 'уточняйте'}</b></div>
+    <div class="rating-block">
+      <div class="rating-num-row"><span class="rating-num" style="color:${ratingColor(r.avg)}">${r.avg!==null?r.avg.toFixed(1):'—'}</span><span class="rating-out">/ 5 · среднее по источникам</span></div>
+      <div class="rating-bar-track"><div class="rating-bar-fill" style="width:${r.avg!==null?(r.avg/5*100).toFixed(0):0}%"></div></div>
+      <div class="source-chips">${sourceChipsHtml(r.ratings)}</div>
+    </div>
+    <div class="card-foot">
+      <span class="check">${r.check ? `Средний чек <b>~${r.check} ₽</b>` : 'Чек уточняйте'}</span>
+      <div class="link-row">${photo ? `<a class="map-link" href="${photo}" target="_blank" rel="noopener">Фото →</a>` : ''}<a class="map-link" href="${r.map}" target="_blank" rel="noopener">2ГИС →</a></div>
+    </div>`;
+  return el;
+}
+
+function chainCard(ch){
+  const el=document.createElement('article'); el.className='card';
+  const uid = 'chain_'+ch.name.replace(/[^a-zA-Zа-яА-Я0-9]/g,'');
+  el.innerHTML = `
+    <span class="corner"></span><span class="corner br"></span>
+    <div class="card-top"><h3 class="card-name">${ch.name}</h3><span class="card-type">${ch.type}</span></div>
+    <span class="chain-badge">${ch.locations.length} точек в городе</span>
+    <p class="card-desc">${ch.desc}</p>
+    <div class="tag-row">${ch.cuisines.map(c=>`<span class="tag">${c}</span>`).join('')}</div>
+    <div class="hours-line">Часы: <b>${ch.hours}</b></div>
+    <div class="rating-block">
+      <div class="rating-num-row"><span class="rating-num" style="color:${ratingColor(ch.avg)}">${ch.avg!==null?ch.avg.toFixed(1):'—'}</span><span class="rating-out">/ 5 · среднее по всем точкам</span></div>
+      <div class="rating-bar-track"><div class="rating-bar-fill" style="width:${ch.avg!==null?(ch.avg/5*100).toFixed(0):0}%"></div></div>
+    </div>
+    <button class="expand-btn" id="${uid}_btn">Показать все адреса ↓</button>
+    <div class="chain-locations" id="${uid}_list">
+      ${ch.locations.map(l=>{
+        const photo = photoLink(l.map);
+        return `<div class="loc-row">
+          <div><span class="loc-addr">${l.address}</span><br><span class="loc-district">${l.district==="уточняется"?"район уточняется":l.district+" район"}</span></div>
+          <div style="text-align:right">
+            <div class="loc-rating" style="color:${ratingColor(l.avg)}">${l.avg!==null?l.avg.toFixed(1):'нет данных'}</div>
+            <a class="loc-link map-link" href="${l.map}" target="_blank" rel="noopener">2ГИС${photo?' · фото':''} →</a>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  setTimeout(()=>{
+    const btn=document.getElementById(uid+'_btn'), list=document.getElementById(uid+'_list');
+    btn.addEventListener('click', ()=>{
+      const open = list.classList.toggle('open');
+      btn.textContent = open ? 'Скрыть адреса ↑' : 'Показать все адреса ↓';
+    });
+  },0);
+  return el;
+}
+
+function render(){
+  let list = currentCatData().filter(item=>{
+    if(state.search && !item.name.toLowerCase().includes(state.search)) return false;
+    if(state.district!=="all" && !itemDistricts(item).includes(state.district)) return false;
+    if(state.cuisine && !item.cuisines.includes(state.cuisine)) return false;
+    if(item.avg===null || item.avg < state.minRating) return item.avg===null && state.minRating===0;
+    return true;
+  });
+
+  if(state.sort==="rating_desc") list.sort((a,b)=>(b.avg??0)-(a.avg??0));
+  if(state.sort==="name_asc") list.sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  if(state.sort==="check_asc") list.sort((a,b)=>{
+    const ca = a.isChain ? Math.min(...a.locations.map(l=>l.check??99999)) : (a.check??99999);
+    const cb = b.isChain ? Math.min(...b.locations.map(l=>l.check??99999)) : (b.check??99999);
+    return ca-cb;
+  });
+
+  const grid=document.getElementById('grid'); grid.innerHTML="";
+  const total = currentCatData().length;
+  if(list.length===0){
+    grid.innerHTML=`<div class="empty-state">Ничего не найдено в этой категории — попробуйте сбросить фильтры или выбрать другой район.</div>`;
+  } else {
+    list.forEach(item=> grid.appendChild(item.isChain ? chainCard(item) : venueCard(item)));
+  }
+  document.getElementById('countLine').textContent = list.length===total ? `Показаны все ${total} карточек` : `Найдено: ${list.length} из ${total}`;
+  syncMapToFilters(list);
+}
+
+buildCuisineChips(); buildDistrictOptions();
+
+/* ---------------- MAP (live geocoding via Nominatim/OpenStreetMap) ---------------- */
+const map = L.map('mapEl', { scrollWheelZoom:true }).setView([56.851, 53.205], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:19, attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+const mapPoints = []; // {item, marker}
+
+function makeIcon(color){
+  return L.divIcon({
+    className:'', html:`<div style="width:16px;height:16px;background:${color};border:2px solid #faf6ea;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 4px rgba(0,0,0,.35)"></div>`,
+    iconSize:[16,16], iconAnchor:[8,16], popupAnchor:[0,-16]
+  });
+}
+
+function popupHtml(item, addressOverride, districtOverride, ratingOverride){
+  const rating = ratingOverride!==undefined ? ratingOverride : item.avg;
+  return `<div class="popup-name">${item.name}</div>
+    <div class="popup-meta">${item.cuisines.join(', ')}</div>
+    <div class="popup-meta">${districtOverride||item.district} район · ${addressOverride||item.address}</div>
+    <div class="popup-rating">${rating!==null&&rating!==undefined?rating.toFixed(1):'—'} / 5</div>`;
+}
+
+async function geocode(address){
+  const q = encodeURIComponent(`${address}, Ижевск, Удмуртская Республика, Россия`);
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
+  try{
+    const resp = await fetch(url, { headers:{ 'Accept':'application/json' } });
+    if(!resp.ok) return null;
+    const data = await resp.json();
+    if(data && data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+  }catch(e){ /* network blocked or CORS — handled by caller */ }
+  return null;
+}
+
+const statusEl = document.getElementById('mapStatus').firstElementChild;
+let geocodedCount = 0, failedCount = 0;
+
+async function buildMapPoints(){
+  const toPlace = [
+    ...VENUES.map(v=>({item:v, address:v.address, district:v.district, name:v.name})),
+    ...CHAINS.map(ch=>({item:ch, address:ch.locations[0].address, district:ch.locations[0].district, name:ch.name, flagshipRating:ch.locations[0].avg}))
+  ];
+  for(let i=0;i<toPlace.length;i++){
+    const p = toPlace[i];
+    statusEl.textContent = `Ищем точки на карте: ${i+1} из ${toPlace.length}…`;
+    const coords = await geocode(p.address);
+    if(coords){
+      const marker = L.marker(coords, { icon: makeIcon(p.item.isChain ? '#33564f' : '#a23226') });
+      marker.bindPopup(popupHtml(p.item, p.address, p.district, p.flagshipRating));
+      marker.on('mouseover', ()=> marker.openPopup());
+      marker.on('mouseout', ()=> marker.closePopup());
+      marker.addTo(map);
+      mapPoints.push({ item:p.item, marker });
+      geocodedCount++;
+    } else {
+      failedCount++;
+    }
+    await new Promise(res=>setTimeout(res, 1100)); // respect Nominatim's 1 req/sec usage policy
+  }
+  statusEl.textContent = failedCount===0
+    ? `Показано ${geocodedCount} точек на карте.`
+    : `Показано ${geocodedCount} точек, ${failedCount} не удалось найти по этому геосервису.`;
+  syncMapToFilters(currentCatData().filter(item=>{
+    if(state.search && !item.name.toLowerCase().includes(state.search)) return false;
+    if(state.district!=="all" && !itemDistricts(item).includes(state.district)) return false;
+    if(state.cuisine && !item.cuisines.includes(state.cuisine)) return false;
+    return true;
+  }));
+}
+
+function syncMapToFilters(visibleList){
+  const visibleSet = new Set(visibleList);
+  mapPoints.forEach(p=>{
+    const shouldShow = visibleSet.has(p.item);
+    const has = map.hasLayer(p.marker);
+    if(shouldShow && !has) p.marker.addTo(map);
+    if(!shouldShow && has) map.removeLayer(p.marker);
+  });
+}
+
+render();
+buildMapPoints();
+</script>
+</body>
+</html>
